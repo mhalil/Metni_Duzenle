@@ -1,0 +1,435 @@
+import sys
+import re
+import json
+import os
+from datetime import datetime
+
+try:
+    import keyboard
+    HAS_KEYBOARD = True
+except ImportError:
+    HAS_KEYBOARD = False
+
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+                               QHBoxLayout, QPushButton, QPlainTextEdit, QListWidget,
+                               QSplitter, QDialog, QLabel, QCheckBox, QLineEdit,
+                               QMessageBox, QListWidgetItem, QFrame, QScrollArea, QFormLayout)
+from PySide6.QtGui import QGuiApplication, QFont, QIcon, QColor, QPalette, QTextCursor
+from PySide6.QtCore import Qt, Signal, QObject, QTimer
+
+SETTINGS_FILE = "ayarlar.json"
+
+class HotkeyListener(QObject):
+    pressed = Signal()
+
+class AyarlarDialog(QDialog):
+    def __init__(self, parent=None, current_settings=None):
+        super().__init__(parent)
+        self.setWindowTitle("Ayarlar")
+        self.resize(350, 300)
+        self.settings = current_settings or {}
+        
+        layout = QVBoxLayout(self)
+        
+        form_layout = QFormLayout()
+        
+        self.chk_always_on_top = QCheckBox("Uygulamayı Her Zaman Üstte Tut")
+        self.chk_always_on_top.setChecked(self.settings.get("always_on_top", False))
+        
+        self.chk_dark_mode = QCheckBox("Karanlık Mod (Dark Mode)")
+        self.chk_dark_mode.setChecked(self.settings.get("dark_mode", False))
+        
+        self.chk_clean_pages = QCheckBox("Sayfa Numaralarını Temizle")
+        self.chk_clean_pages.setChecked(self.settings.get("clean_page_numbers", True))
+        
+        self.chk_fix_turkish = QCheckBox("Bozuk Türkçe Karakterleri Düzelt")
+        self.chk_fix_turkish.setChecked(self.settings.get("fix_turkish_chars", True))
+        
+        self.txt_hotkey = QLineEdit()
+        self.txt_hotkey.setText(self.settings.get("global_hotkey", "ctrl+shift+e"))
+        self.txt_hotkey.setPlaceholderText("Örn: ctrl+shift+e")
+        
+        form_layout.addRow(self.chk_always_on_top)
+        form_layout.addRow(self.chk_dark_mode)
+        form_layout.addRow(self.chk_clean_pages)
+        form_layout.addRow(self.chk_fix_turkish)
+        form_layout.addRow("Kısayol Tuşu:", self.txt_hotkey)
+        
+        layout.addLayout(form_layout)
+        
+        if not HAS_KEYBOARD:
+            warn_lbl = QLabel("Kısayol tuşunun çalışması için sisteminizde 'keyboard'\nmodülü yüklü olmalıdır. (pip install keyboard)")
+            warn_lbl.setStyleSheet("color: #e74c3c; font-size: 11px;")
+            layout.addWidget(warn_lbl)
+            
+        btn_kaydet = QPushButton("Kaydet")
+        btn_kaydet.setMinimumHeight(35)
+        btn_kaydet.setStyleSheet("background-color: #3498db; color: white; border-radius: 4px;")
+        btn_kaydet.clicked.connect(self.accept)
+        
+        layout.addStretch()
+        layout.addWidget(btn_kaydet)
+
+    def get_settings(self):
+        return {
+            "always_on_top": self.chk_always_on_top.isChecked(),
+            "dark_mode": self.chk_dark_mode.isChecked(),
+            "clean_page_numbers": self.chk_clean_pages.isChecked(),
+            "fix_turkish_chars": self.chk_fix_turkish.isChecked(),
+            "global_hotkey": self.txt_hotkey.text().strip()
+        }
+
+class MetinDuzenleyici(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle(".:: Metni Düzenle ::.")
+        self.resize(950, 550)
+        
+        self.history_data = []
+        self.hotkey_listener = HotkeyListener()
+        self.hotkey_listener.pressed.connect(self.arka_planda_duzenle)
+        
+        self.load_settings()
+        self.init_ui()
+        self.apply_settings()
+        self.register_hotkey()
+
+    def load_settings(self):
+        self.settings = {
+            "always_on_top": False,
+            "dark_mode": False,
+            "clean_page_numbers": True,
+            "fix_turkish_chars": True,
+            "global_hotkey": "ctrl+shift+e"
+        }
+        if os.path.exists(SETTINGS_FILE):
+            try:
+                with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                    self.settings.update(loaded)
+            except Exception as e:
+                print("Ayarlar yüklenemedi:", e)
+
+    def save_settings(self):
+        try:
+            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.settings, f, indent=4)
+        except Exception as e:
+            print("Ayarlar kaydedilemedi:", e)
+
+    def apply_settings(self):
+        # Always on top
+        if self.settings.get("always_on_top"):
+            self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+        else:
+            self.setWindowFlag(Qt.WindowStaysOnTopHint, False)
+        self.show() # Pencere bayrakları değiştiğinde yeniden göstermek gerekir
+        
+        # Dark Mode
+        if self.settings.get("dark_mode"):
+            self.setStyleSheet("""
+                QMainWindow, QDialog, QWidget { background-color: #2b2b2b; color: #f1f1f1; }
+                QPlainTextEdit { background-color: #1e1e1e; color: #d4d4d4; border: 1px solid #555; }
+                QListWidget { background-color: #1e1e1e; color: #d4d4d4; border: 1px solid #555; }
+                QListWidget::item:selected { background-color: #0e639c; }
+                QPushButton { background-color: #3a3d41; border: 1px solid #555; padding: 5px; color: #f1f1f1; border-radius: 3px;}
+                QPushButton:hover { background-color: #4a4d51; }
+                QLineEdit { background-color: #1e1e1e; color: white; border: 1px solid #555; }
+            """)
+        else:
+            self.setStyleSheet("""
+                QMainWindow, QDialog, QWidget { background-color: #f0f0f0; color: #333; }
+                QPlainTextEdit { background-color: #ffffff; color: #333; border: 1px solid #ccc; }
+                QListWidget { background-color: #ffffff; color: #333; border: 1px solid #ccc; }
+                QListWidget::item:selected { background-color: #0078d7; color: white; }
+                QPushButton { background-color: #e1e1e1; border: 1px solid #ccc; padding: 5px; color: #333; border-radius: 3px;}
+                QPushButton:hover { background-color: #d1d1d1; }
+                QLineEdit { background-color: #ffffff; color: #333; border: 1px solid #ccc; }
+            """)
+            
+        # Ana butonun stilini her iki modda da koruyalım
+        self.buton_duzenle.setStyleSheet("""
+            QPushButton {
+                background-color: #20c997;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 10px 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1ba87e; }
+            QPushButton:pressed { background-color: #168a66; }
+        """)
+
+    def register_hotkey(self):
+        if not HAS_KEYBOARD:
+            return
+            
+        try:
+            keyboard.unhook_all()
+        except:
+            pass
+            
+        hotkey = self.settings.get("global_hotkey", "")
+        if hotkey:
+            try:
+                # Klavye thread'inden Qt thread'ine sinyal gönderiyoruz
+                keyboard.add_hotkey(hotkey, lambda: self.hotkey_listener.pressed.emit())
+            except Exception as e:
+                print("Kısayol tuşu ayarlanamadı:", e)
+
+    def init_ui(self):
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Üst Araç Çubuğu (Toolbar)
+        top_toolbar = QHBoxLayout()
+        
+        btn_buyuk = QPushButton("BÜYÜK HARFE ÇEVİR")
+        btn_buyuk.clicked.connect(lambda: self.metin_donustur("buyuk"))
+        btn_kucuk = QPushButton("küçük harfe çevir")
+        btn_kucuk.clicked.connect(lambda: self.metin_donustur("kucuk"))
+        btn_ilk = QPushButton("Kelimelerin İlk Harfleri Büyük")
+        btn_ilk.clicked.connect(lambda: self.metin_donustur("ilk"))
+        btn_cumle = QPushButton("Cümlelerin İlk Harfleri Büyük")
+        btn_cumle.clicked.connect(lambda: self.metin_donustur("cumle"))
+        
+        top_toolbar.addWidget(btn_buyuk)
+        top_toolbar.addWidget(btn_kucuk)
+        top_toolbar.addWidget(btn_ilk)
+        top_toolbar.addWidget(btn_cumle)
+        top_toolbar.addStretch()
+        
+        btn_hakkinda = QPushButton("Hakkında")
+        btn_hakkinda.clicked.connect(self.goster_hakkinda)
+        btn_yardim = QPushButton("Yardım")
+        btn_yardim.clicked.connect(self.goster_yardim)
+        btn_ayarlar = QPushButton("Ayarlar")
+        btn_ayarlar.clicked.connect(self.goster_ayarlar)
+        
+        top_toolbar.addWidget(btn_hakkinda)
+        top_toolbar.addWidget(btn_yardim)
+        top_toolbar.addWidget(btn_ayarlar)
+        
+        main_layout.addLayout(top_toolbar)
+        
+        # Orta Bölüm (Geçmiş ve Metin Alanı Splitter'ı)
+        splitter = QSplitter(Qt.Horizontal)
+        
+        # Geçmiş Paneli
+        history_widget = QWidget()
+        history_layout = QVBoxLayout(history_widget)
+        history_layout.setContentsMargins(0, 0, 0, 0)
+        history_layout.addWidget(QLabel("<b>Geçmiş</b>"))
+        
+        self.list_history = QListWidget()
+        self.list_history.itemClicked.connect(self.history_item_clicked)
+        history_layout.addWidget(self.list_history)
+        
+        # Metin Paneli
+        self.metin_kutusu = QPlainTextEdit()
+        self.metin_kutusu.setFont(QFont("Tahoma", 11))
+        
+        splitter.addWidget(history_widget)
+        splitter.addWidget(self.metin_kutusu)
+        splitter.setSizes([200, 700])
+        
+        main_layout.addWidget(splitter)
+        
+        # Alt Buton
+        self.buton_duzenle = QPushButton("Kopyalanmış Metni Düzenle ve Panoya Kopyala")
+        self.buton_duzenle.setMinimumHeight(45)
+        self.buton_duzenle.setFont(QFont("Tahoma", 10, QFont.Bold))
+        self.buton_duzenle.setCursor(Qt.PointingHandCursor)
+        self.buton_duzenle.clicked.connect(self.duzenle_ve_kopyala)
+        main_layout.addWidget(self.buton_duzenle)
+
+    def goster_hakkinda(self):
+        QMessageBox.about(self, "Hakkında", 
+            "<b>Metni Düzenle v1.1</b><br><br>"
+            "Bu uygulama PDF dosyası, web sayfası veya harici bir kaynaktan kopyalanan metinlerin "
+            "satır ve paragraf yapısını onarmak için geliştirilmiştir.<br><br>"
+            "Geliştirici: Mustafa Halil GÖRENTAŞ<br><br>"
+            "<b>Programlama Dili ve Modül Bilgisi:</b><br>"
+            "    Programlama Dili: <b>PYTHON</b><br>"
+            "    Modül: <b>PySide6</b><br>"
+            "Lisans: <b>MIT Lisansı</b>"
+        )
+
+    def goster_yardim(self):
+        yardim_metni = (
+            """
+                <b>Kullanım Rehberi:</b><br>
+
+                <b>1.</b> PDF dosyası, web sayfası veya harici bir kaynaktan sorunlu (satırları kopuk) metni kopyalayın (`Ctrl+C`).<br>
+                <b>2.</b> <b>"Kopyalanmış Metni Düzenle ve Panoya Kopyala"</b> butonuna basın veya önceden belirlediğiniz <b>Kısayol Tuşunu</b> (`Ctrl+Shift+E` vb.) kullanın.<br>
+                <b>3.</b> Düzenlenmiş metin anında panonuza kopyalanacaktır.<br>
+                <b>4.</b> Düzenlenmiş metni istediğiniz yere doğrudan yapıştırın (`Ctrl+V`).<br><br>
+
+                <b>Ayarlar:</b><br>
+                Uygulamanın sağ üst köşesindeki <b>Ayarlar</b> butonunu kullanarak;
+                <ul>
+                <li> <b>Kısayol tuşunuzu</b> değiştirebilir,</li>
+                <li> <b>Karanlık Modu</b> açıp kapatabilir,</li>
+                <li> <b>Otomatik sayfa numarası temizleme</b> özelliğini açıp kapatabilirsiniz,</li>
+                <li> <b>Türkçe karakter düzelticisini</b> açıp kapatabilirsiniz.</li>
+                </ul><br>
+            """
+            
+        )
+        QMessageBox.information(self, "Yardım", yardim_metni)
+
+    def goster_ayarlar(self):
+        dialog = AyarlarDialog(self, self.settings)
+        if dialog.exec():
+            yeni_ayarlar = dialog.get_settings()
+            eski_kisayol = self.settings.get("global_hotkey")
+            self.settings = yeni_ayarlar
+            self.save_settings()
+            self.apply_settings()
+            
+            # Kısayol değiştiyse veya klavye dinleyicisi güncellenecekse
+            if eski_kisayol != self.settings.get("global_hotkey"):
+                self.register_hotkey()
+
+    def metin_donustur(self, mod):
+        metin = self.metin_kutusu.toPlainText()
+        if not metin:
+            return
+            
+        def turkce_upper(harf):
+            if harf == 'i': return 'İ'
+            if harf == 'ı': return 'I'
+            return harf.upper()
+            
+        def title_match(m):
+            return m.group(1) + turkce_upper(m.group(2))
+            
+        if mod == "buyuk":
+            metin = metin.replace("i", "İ").replace("ı", "I").upper()
+        elif mod == "kucuk":
+            metin = metin.replace("İ", "i").replace("I", "ı").lower()
+        elif mod == "ilk":
+            metin = metin.replace("İ", "i").replace("I", "ı").lower()
+            metin = re.sub(r'(^|\s)([^\W\d_])', title_match, metin)
+        elif mod == "cumle":
+            metin = metin.replace("İ", "i").replace("I", "ı").lower()
+            # 1. Metnin en başındaki ilk harfi büyük yap
+            metin = re.sub(r'(^\s*)([^\W\d_])', title_match, metin)
+            # 2. Nokta, ünlem veya soru işaretinden sonraki ilk harfi büyük yap
+            metin = re.sub(r'([.!?]\s+)([^\W\d_])', title_match, metin)
+            # 3. Yeni bir satır (başlık veya yeni paragraf) başladığında ilk harfi büyük yap
+            metin = re.sub(r'(\n\s*)([^\W\d_])', title_match, metin)
+            
+        self.metin_kutusu.setPlainText(metin)
+        QGuiApplication.clipboard().setText(metin)
+
+    def arka_planda_duzenle(self):
+        # Kısayol tuşuna basıldığında tetiklenir
+        self.duzenle_ve_kopyala()
+        
+        # Kullanıcıya ufak bir geri bildirim göstermek için pencereyi parlatabiliriz veya title değiştirebiliriz
+        orijinal_title = self.windowTitle()
+        self.setWindowTitle("Düzenlendi ve Kopyalandı! ✔")
+        QTimer.singleShot(1500, lambda: self.setWindowTitle(orijinal_title))
+
+    def clean_page_numbers(self, satirlar):
+        temiz = []
+        for satir in satirlar:
+            s = satir.strip()
+            # Sadece sayılardan oluşuyorsa atla
+            if s.isdigit():
+                continue
+            # "Sayfa 12", "Page 15" formatındaysa atla
+            if re.match(r'^(sayfa|page)\s*\d+$', s, re.IGNORECASE):
+                continue
+            temiz.append(satir)
+        return temiz
+
+    def fix_turkish_chars(self, text):
+        mapping = {
+            'Ý': 'İ', 'ý': 'ı', 'Þ': 'Ş', 'þ': 'ş', 'Ð': 'Ğ', 'ð': 'ğ',
+            'Ý': 'İ', 'Ý': 'İ'  # Bazı diğer yaygın pdf hataları buraya eklenebilir
+        }
+        for bozuk, dogru in mapping.items():
+            text = text.replace(bozuk, dogru)
+        return text
+
+    def history_item_clicked(self, item):
+        index = self.list_history.row(item)
+        if 0 <= index < len(self.history_data):
+            self.metin_kutusu.setPlainText(self.history_data[index])
+
+    def add_to_history(self, text):
+        # Eğer en son eklenenle aynıysa ekleme
+        if self.history_data and self.history_data[0] == text:
+            return
+            
+        self.history_data.insert(0, text)
+        ozet = text[:40].replace('\n', ' ') + "..." if len(text) > 40 else text.replace('\n', ' ')
+        
+        self.list_history.insertItem(0, ozet)
+        
+        # Sınırlandırma: En fazla 20 geçmiş kalsın
+        if len(self.history_data) > 20:
+            self.history_data.pop()
+            self.list_history.takeItem(20)
+
+    def duzenle_ve_kopyala(self):
+        clipboard = QGuiApplication.clipboard()
+        pano_icerigi = clipboard.text()
+        
+        if not pano_icerigi:
+            return
+            
+        # 1. Türkçe karakter düzeltmesi
+        if self.settings.get("fix_turkish_chars", True):
+            pano_icerigi = self.fix_turkish_chars(pano_icerigi)
+            
+        satirlar = pano_icerigi.splitlines()
+        
+        # 2. Sayfa numaralarını temizleme
+        if self.settings.get("clean_page_numbers", True):
+            satirlar = self.clean_page_numbers(satirlar)
+            
+        satirlar_temiz = [s.rstrip() for s in satirlar]
+        
+        uzunluklar = [len(s) for s in satirlar_temiz if s]
+        if not uzunluklar:
+            return
+            
+        max_uzunluk = max(uzunluklar)
+        esik_uzunluk = max_uzunluk * 0.60 if max_uzunluk > 40 else 0
+        
+        metin = ""
+        bitis_isaretleri = (".", "!", "?", ":", '."', '!"', '?"', ".'", "!'", "?'")
+        
+        for satir_temiz in satirlar_temiz:
+            if not satir_temiz:
+                metin += "\n\n"
+            elif satir_temiz.endswith("-") or satir_temiz.endswith("‐") or satir_temiz.endswith("‑"):
+                metin += satir_temiz[:-1]
+            elif satir_temiz.endswith(bitis_isaretleri):
+                metin += satir_temiz + "\n\n"
+            elif len(satir_temiz) < esik_uzunluk:
+                metin += satir_temiz + "\n\n"
+            else:
+                metin += satir_temiz + " "
+                
+        metin = re.sub(r'\n{3,}', '\n\n', metin)
+        metin = metin.strip()
+        
+        self.metin_kutusu.setPlainText(metin)
+        clipboard.setText(metin)
+        
+        self.add_to_history(metin)
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    
+    pencere = MetinDuzenleyici()
+    pencere.show()
+    sys.exit(app.exec())
