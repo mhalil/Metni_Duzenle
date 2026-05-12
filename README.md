@@ -1,10 +1,10 @@
-# Metni Düzenle v1.1
+# Metni Düzenle v1.2
 
-**Metni Düzenle**, PDF dosyalarından, web sayfalarından veya çeşitli belgelerden kopyalanan metinlerdeki bozuk satır ve paragraf yapılarını otomatik olarak onaran ve çeviri uygulamalarına (veya metin editörlerine) yapıştırmaya hazır hale getiren akıllı bir masaüstü asistanıdır.
+**Metni Düzenle**, PDF dosyalarından, web sayfalarından veya çeşitli belgelerden kopyalanan metinlerdeki bozuk satır ve paragraf yapılarını otomatik olarak onaran/düzenleyen ve Word, Not Defteri, çeviri uygulamalarına, ..vb yapıştırmaya hazır hale getiren akıllı bir masaüstü asistanıdır.
 
 Kopyalanan metinlerin satır aralıklarındaki kopuklukları, hece bölmelerini (tireleri) ve gereksiz satır atlamalarını temizleyerek metnin cümle ve paragraf bütünlüğünü geri kazandırır.
 
-## 🚀 v1.1 Sürüm Özellikleri
+## 🚀 v1.2 Sürüm Özellikleri
 
 * **Akıllı Başlık ve Paragraf Tespiti:** Noktalama işaretiyle bitmese dahi, kısa satırları veya başlıkları otomatik olarak algılar ve kendisinden sonra gelen paragrafla karışmasını engeller.
 * **Arka Planda Düzenleme (Kısayol Tuşu):** Uygulama arka planda simge durumundayken bile, kopyaladığınız metni ayarladığınız kısayol tuşuyla (Örn: `Ctrl + Shift + E`) anında düzenleyip panoya geri yapıştırır.
@@ -14,6 +14,7 @@ Kopyalanan metinlerin satır aralıklarındaki kopuklukları, hece bölmelerini 
 * **Geçmiş (History) Sekmesi:** Kopyalayıp düzenlediğiniz son metinlere uygulamanın sol panelinden ulaşabilir, kaybolan verilerinizi geri getirebilirsiniz.
 * **Karanlık Mod (Dark Mode):** Göz yormayan şık bir arayüz.
 * **Her Zaman Üstte:** Uygulama penceresinin okuduğunuz belge kapanıp arkada kalmasını engeller.
+* **Orijinale Çevir Butonu:** Bir kaynaktan kopyalanıp düzenlenmiş metnin karakter yapısı değiştirilmiş (örneğin küçük ya da büyük harfe çevrilmiş) olsa bile, ilk düzenlemenin yapıldığı orijinal haline çevirir.
 
 ## 🛠️ Kurulum Gereksinimleri
 
@@ -54,49 +55,52 @@ Kopyalanan metin, not defterine yapıştırıldığında aşağıdaki sonuç eld
 
 Uygulamanın ilk çalıştırılması ile karşılaşılan görüntü;
 
-![v1.1_01](img/v1.1_01.jpg)
+![v1.2_01](img/v1.2_01.png)
 
 **Kopyalanmış Metni Düzenle ve Panoya Kopyala** butonuna basılınca veya önceden belirlediğiniz **Kısayol Tuşuna** (`Ctrl+Shift+E` vb.) basıldığında, kopyalanmış olan metin, kaynaktaki metnin cümle ve paragraf yapısına uygun olacak şekilde düzenleniyor ve uygulama içerisinde görüntüleniyor.
 
 Kopyalanıp düzenlenen metin, sol kısımdaki **Geçmiş** Panelinde görüntülenip seçilebiliyor. 
 
-![v1.1_02](img/v1.1_02.jpg)
+![v1.2_02](img/v1.2_02.png)
 
 **Karakter Manipülasyon Butonlarını** kullanarak, kopyalanıp düzenlenmiş metin için, daha fazla kontrol sağlamış oluyoruz. Örneğin **BÜYÜK HARFE ÇEVİR** butonuna basarak tüm harfler büyük hale getirilebiliyor. 
 
-![v1.1_03](img/v1.1_03.jpg)
+![v1.2_03](img/v1.2_03.png)
 
-**Kelimelerin İlk Harfleri Büyük** butonuna basıldığında elde edilen sonu.;
+**Orijinale Çevir** butonuna basıldığında elde edilen sonuç;
 
-![v1.1_04](img/v1.1_04.jpg)
+![v1.2_04](img/v1.2_04.png)
 
 İkinci bir metin kopyalanıp düzenlendiğinde Geçmiş Panelinde 2 metin de görüntüleniyor.
 
-![v1.1_05](img/v1.1_05.jpg)
+![v1.2_05](img/v1.2_05.png)
 
 **Ayarlar** butonu ile Ayarlar penceresi açılabilir.
 
-![v1.1_06](img/v1.1_06.jpg)
+![v1.2_06](img/v1.2_06.png)
 
-**Karanlık Mod** Özelliği Aktif edildi.
+**Karanlık Mod** özelliği aktif edildi ve kaydedildi.
 
-![v1.1_07](img/v1.1_07.jpg)
+![v1.2_07](img/v1.2_07.png)
 
 Karanlık Moddaki Uygulama görüntüsü;
 
-![v1.1_08](img/v1.1_08.jpg)
+![v1.2_08](img/v1.2_08.png)
 
 **Yardım Butonu** ile açılan Yardım Penceresinde Kullanım Rehberi ve Ayarlar konusunda  bilgiler sunuluyor.
 
-![v1.1_09](img/v1.1_09.jpg)
+![v1.2_09](img/v1.2_09.png)
 
 Hakkında Penceresinde, Versiyon (sürüm), Geliştirici, ..vb bilgileri sunuluyor.
 
-![v1.1_10](img/v1.1_10.jpg)
+![v1.2_10](img/v1.2_10.png)
 
 ## ℹ️ Geliştirici ve Uygulama Bilgileri
 
 **Geliştirici:** Mustafa Halil GÖRENTAŞ
+**Platform:** Google Antigravity
+
+**Metodoloji:** Vibe Coding
 **Programlama Dili:** Python
 **Arayüz:** PySide6
-**Lisans:** MIT
+**Lisans:** [MIT](https://www.ozgurlisanslar.org.tr/mit/)

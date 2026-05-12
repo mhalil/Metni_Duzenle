@@ -86,6 +86,7 @@ class MetinDuzenleyici(QMainWindow):
         self.resize(950, 550)
         
         self.history_data = []
+        self.current_original_text = ""
         self.hotkey_listener = HotkeyListener()
         self.hotkey_listener.pressed.connect(self.arka_planda_duzenle)
         
@@ -195,11 +196,14 @@ class MetinDuzenleyici(QMainWindow):
         btn_ilk.clicked.connect(lambda: self.metin_donustur("ilk"))
         btn_cumle = QPushButton("Cümlelerin İlk Harfleri Büyük")
         btn_cumle.clicked.connect(lambda: self.metin_donustur("cumle"))
+        btn_orijinal = QPushButton("Orijinale Çevir")
+        btn_orijinal.clicked.connect(lambda: self.metin_donustur("orijinal"))
         
         top_toolbar.addWidget(btn_buyuk)
         top_toolbar.addWidget(btn_kucuk)
         top_toolbar.addWidget(btn_ilk)
         top_toolbar.addWidget(btn_cumle)
+        top_toolbar.addWidget(btn_orijinal)
         top_toolbar.addStretch()
         
         btn_hakkinda = QPushButton("Hakkında")
@@ -248,14 +252,14 @@ class MetinDuzenleyici(QMainWindow):
 
     def goster_hakkinda(self):
         QMessageBox.about(self, "Hakkında", 
-            "<b>Metni Düzenle v1.1</b><br><br>"
-            "Bu uygulama PDF dosyası, web sayfası veya harici bir kaynaktan kopyalanan metinlerin "
-            "satır ve paragraf yapısını onarmak için geliştirilmiştir.<br><br>"
+            "<b>Metni Düzenle v1.2</b><br><br>"
+            "Bu uygulama, PDF dosyası, web sayfası,...vb kaynaklardaki metinleri, "
+            "satır ve paragraf yapısını bozmadan kopyalamak amacıyla geliştirilmiştir.<br><br>"
             "Geliştirici: Mustafa Halil GÖRENTAŞ<br><br>"
             "<b>Programlama Dili ve Modül Bilgisi:</b><br>"
-            "    Programlama Dili: <b>PYTHON</b><br>"
-            "    Modül: <b>PySide6</b><br>"
-            "Lisans: <b>MIT Lisansı</b>"
+            "<b>Programlama Dili:</b> Python<br>"
+            "<b>Kullanıcı Arayüzü:</b> PySide6<br>"
+            "<b>Lisans:</b> MIT Lisansı"
         )
 
     def goster_yardim(self):
@@ -307,7 +311,12 @@ class MetinDuzenleyici(QMainWindow):
         def title_match(m):
             return m.group(1) + turkce_upper(m.group(2))
             
-        if mod == "buyuk":
+        if mod == "orijinal":
+            if self.current_original_text:
+                metin = self.current_original_text
+            else:
+                return
+        elif mod == "buyuk":
             metin = metin.replace("i", "İ").replace("ı", "I").upper()
         elif mod == "kucuk":
             metin = metin.replace("İ", "i").replace("I", "ı").lower()
@@ -360,7 +369,9 @@ class MetinDuzenleyici(QMainWindow):
     def history_item_clicked(self, item):
         index = self.list_history.row(item)
         if 0 <= index < len(self.history_data):
-            self.metin_kutusu.setPlainText(self.history_data[index])
+            metin = self.history_data[index]
+            self.metin_kutusu.setPlainText(metin)
+            self.current_original_text = metin
 
     def add_to_history(self, text):
         # Eğer en son eklenenle aynıysa ekleme
@@ -422,6 +433,7 @@ class MetinDuzenleyici(QMainWindow):
         metin = metin.strip()
         
         self.metin_kutusu.setPlainText(metin)
+        self.current_original_text = metin
         clipboard.setText(metin)
         
         self.add_to_history(metin)
