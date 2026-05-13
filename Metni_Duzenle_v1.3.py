@@ -13,77 +13,22 @@ except ImportError:
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                QHBoxLayout, QPushButton, QPlainTextEdit, QListWidget,
                                QSplitter, QDialog, QLabel, QCheckBox, QLineEdit,
-                               QMessageBox, QListWidgetItem, QFrame, QScrollArea, QFormLayout)
+                               QMessageBox, QListWidgetItem, QFrame, QScrollArea, QFormLayout,
+                               QGroupBox, QRadioButton, QButtonGroup)
 from PySide6.QtGui import QGuiApplication, QFont, QIcon, QColor, QPalette, QTextCursor
 from PySide6.QtCore import Qt, Signal, QObject, QTimer
 
 SETTINGS_FILE = "ayarlar.json"
+HISTORY_FILE = "gecmis.json"
 
 class HotkeyListener(QObject):
     pressed = Signal()
-
-class AyarlarDialog(QDialog):
-    def __init__(self, parent=None, current_settings=None):
-        super().__init__(parent)
-        self.setWindowTitle("Ayarlar")
-        self.resize(350, 300)
-        self.settings = current_settings or {}
-        
-        layout = QVBoxLayout(self)
-        
-        form_layout = QFormLayout()
-        
-        self.chk_always_on_top = QCheckBox("Uygulamayı Her Zaman Üstte Tut")
-        self.chk_always_on_top.setChecked(self.settings.get("always_on_top", False))
-        
-        self.chk_dark_mode = QCheckBox("Karanlık Mod (Dark Mode)")
-        self.chk_dark_mode.setChecked(self.settings.get("dark_mode", False))
-        
-        self.chk_clean_pages = QCheckBox("Sayfa Numaralarını Temizle")
-        self.chk_clean_pages.setChecked(self.settings.get("clean_page_numbers", True))
-        
-        self.chk_fix_turkish = QCheckBox("Bozuk Türkçe Karakterleri Düzelt")
-        self.chk_fix_turkish.setChecked(self.settings.get("fix_turkish_chars", True))
-        
-        self.txt_hotkey = QLineEdit()
-        self.txt_hotkey.setText(self.settings.get("global_hotkey", "ctrl+shift+e"))
-        self.txt_hotkey.setPlaceholderText("Örn: ctrl+shift+e")
-        
-        form_layout.addRow(self.chk_always_on_top)
-        form_layout.addRow(self.chk_dark_mode)
-        form_layout.addRow(self.chk_clean_pages)
-        form_layout.addRow(self.chk_fix_turkish)
-        form_layout.addRow("Kısayol Tuşu:", self.txt_hotkey)
-        
-        layout.addLayout(form_layout)
-        
-        if not HAS_KEYBOARD:
-            warn_lbl = QLabel("Kısayol tuşunun çalışması için sisteminizde 'keyboard'\nmodülü yüklü olmalıdır. (pip install keyboard)")
-            warn_lbl.setStyleSheet("color: #e74c3c; font-size: 11px;")
-            layout.addWidget(warn_lbl)
-            
-        btn_kaydet = QPushButton("Kaydet")
-        btn_kaydet.setMinimumHeight(35)
-        btn_kaydet.setStyleSheet("background-color: #3498db; color: white; border-radius: 4px;")
-        btn_kaydet.clicked.connect(self.accept)
-        
-        layout.addStretch()
-        layout.addWidget(btn_kaydet)
-
-    def get_settings(self):
-        return {
-            "always_on_top": self.chk_always_on_top.isChecked(),
-            "dark_mode": self.chk_dark_mode.isChecked(),
-            "clean_page_numbers": self.chk_clean_pages.isChecked(),
-            "fix_turkish_chars": self.chk_fix_turkish.isChecked(),
-            "global_hotkey": self.txt_hotkey.text().strip()
-        }
 
 class MetinDuzenleyici(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(".:: Metni Düzenle ::.")
-        self.resize(950, 550)
+        self.resize(1150, 600)
         
         self.history_data = []
         self.current_original_text = ""
@@ -92,6 +37,7 @@ class MetinDuzenleyici(QMainWindow):
         
         self.load_settings()
         self.init_ui()
+        self.load_history()
         self.apply_settings()
         self.register_hotkey()
 
@@ -118,6 +64,25 @@ class MetinDuzenleyici(QMainWindow):
         except Exception as e:
             print("Ayarlar kaydedilemedi:", e)
 
+    def load_history(self):
+        if os.path.exists(HISTORY_FILE):
+            try:
+                with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                    self.history_data = json.load(f)
+                    
+                for text in self.history_data:
+                    ozet = text[:40].replace('\n', ' ') + "..." if len(text) > 40 else text.replace('\n', ' ')
+                    self.list_history.addItem(ozet)
+            except Exception as e:
+                print("Geçmiş yüklenemedi:", e)
+
+    def save_history(self):
+        try:
+            with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.history_data, f, indent=4)
+        except Exception as e:
+            print("Geçmiş kaydedilemedi:", e)
+
     def apply_settings(self):
         # Always on top
         if self.settings.get("always_on_top"):
@@ -136,6 +101,8 @@ class MetinDuzenleyici(QMainWindow):
                 QPushButton { background-color: #3a3d41; border: 1px solid #555; padding: 5px; color: #f1f1f1; border-radius: 3px;}
                 QPushButton:hover { background-color: #4a4d51; }
                 QLineEdit { background-color: #1e1e1e; color: white; border: 1px solid #555; }
+                QGroupBox { border: 1px solid #555; border-radius: 4px; margin-top: 2ex; font-weight: bold; }
+                QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; padding: 0 3px; }
             """)
         else:
             self.setStyleSheet("""
@@ -146,6 +113,8 @@ class MetinDuzenleyici(QMainWindow):
                 QPushButton { background-color: #e1e1e1; border: 1px solid #ccc; padding: 5px; color: #333; border-radius: 3px;}
                 QPushButton:hover { background-color: #d1d1d1; }
                 QLineEdit { background-color: #ffffff; color: #333; border: 1px solid #ccc; }
+                QGroupBox { border: 1px solid #ccc; border-radius: 4px; margin-top: 2ex; font-weight: bold; }
+                QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; padding: 0 3px; }
             """)
             
         # Ana butonun stilini her iki modda da koruyalım
@@ -185,40 +154,6 @@ class MetinDuzenleyici(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Üst Araç Çubuğu (Toolbar)
-        top_toolbar = QHBoxLayout()
-        
-        btn_buyuk = QPushButton("BÜYÜK HARFE ÇEVİR")
-        btn_buyuk.clicked.connect(lambda: self.metin_donustur("buyuk"))
-        btn_kucuk = QPushButton("küçük harfe çevir")
-        btn_kucuk.clicked.connect(lambda: self.metin_donustur("kucuk"))
-        btn_ilk = QPushButton("Kelimelerin İlk Harfleri Büyük")
-        btn_ilk.clicked.connect(lambda: self.metin_donustur("ilk"))
-        btn_cumle = QPushButton("Cümlelerin İlk Harfleri Büyük")
-        btn_cumle.clicked.connect(lambda: self.metin_donustur("cumle"))
-        btn_orijinal = QPushButton("Orijinale Çevir")
-        btn_orijinal.clicked.connect(lambda: self.metin_donustur("orijinal"))
-        
-        top_toolbar.addWidget(btn_buyuk)
-        top_toolbar.addWidget(btn_kucuk)
-        top_toolbar.addWidget(btn_ilk)
-        top_toolbar.addWidget(btn_cumle)
-        top_toolbar.addWidget(btn_orijinal)
-        top_toolbar.addStretch()
-        
-        btn_hakkinda = QPushButton("Hakkında")
-        btn_hakkinda.clicked.connect(self.goster_hakkinda)
-        btn_yardim = QPushButton("Yardım")
-        btn_yardim.clicked.connect(self.goster_yardim)
-        btn_ayarlar = QPushButton("Ayarlar")
-        btn_ayarlar.clicked.connect(self.goster_ayarlar)
-        
-        top_toolbar.addWidget(btn_hakkinda)
-        top_toolbar.addWidget(btn_yardim)
-        top_toolbar.addWidget(btn_ayarlar)
-        
-        main_layout.addLayout(top_toolbar)
-        
         # Orta Bölüm (Geçmiş ve Metin Alanı Splitter'ı)
         splitter = QSplitter(Qt.Horizontal)
         
@@ -232,29 +167,154 @@ class MetinDuzenleyici(QMainWindow):
         self.list_history.itemClicked.connect(self.history_item_clicked)
         history_layout.addWidget(self.list_history)
         
+        history_btn_layout = QHBoxLayout()
+        btn_secili_sil = QPushButton("Seçileni Sil")
+        btn_secili_sil.clicked.connect(self.sil_secili_gecmis)
+        btn_tumunu_sil = QPushButton("Tümünü Sil")
+        btn_tumunu_sil.clicked.connect(self.sil_tum_gecmis)
+        
+        history_btn_layout.addWidget(btn_secili_sil)
+        history_btn_layout.addWidget(btn_tumunu_sil)
+        history_layout.addLayout(history_btn_layout)
+        
         # Metin Paneli
         self.metin_kutusu = QPlainTextEdit()
         self.metin_kutusu.setFont(QFont("Tahoma", 11))
         
+        # Sağ Panel
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Karakter Manipülasyonu
+        self.group_manipulasyon = QGroupBox("Karakter Manipülasyonu")
+        manipulasyon_layout = QVBoxLayout(self.group_manipulasyon)
+        
+        self.radio_orijinal = QRadioButton("Orijinal")
+        self.radio_buyuk = QRadioButton("BÜYÜK HARF")
+        self.radio_kucuk = QRadioButton("küçük harf")
+        self.radio_ilk = QRadioButton("İlk Harfler Büyük")
+        self.radio_cumle = QRadioButton("Cümlelerin İlk Harfleri Büyük")
+        
+        self.radio_orijinal.setChecked(True)
+        
+        self.btn_group = QButtonGroup(self)
+        self.btn_group.addButton(self.radio_orijinal, 1)
+        self.btn_group.addButton(self.radio_buyuk, 2)
+        self.btn_group.addButton(self.radio_kucuk, 3)
+        self.btn_group.addButton(self.radio_ilk, 4)
+        self.btn_group.addButton(self.radio_cumle, 5)
+        
+        manipulasyon_layout.addWidget(self.radio_orijinal)
+        manipulasyon_layout.addWidget(self.radio_buyuk)
+        manipulasyon_layout.addWidget(self.radio_kucuk)
+        manipulasyon_layout.addWidget(self.radio_ilk)
+        manipulasyon_layout.addWidget(self.radio_cumle)
+        
+        self.btn_group.idToggled.connect(self.on_radio_toggled)
+        
+        right_layout.addWidget(self.group_manipulasyon)
+        
+        # Ayarlar
+        self.group_ayarlar = QGroupBox("Ayarlar")
+        
+        ayarlar_layout = QFormLayout(self.group_ayarlar)
+        
+        self.chk_always_on_top = QCheckBox("Uygulamayı Her Zaman Üstte Tut")
+        self.chk_always_on_top.setChecked(self.settings.get("always_on_top", False))
+        self.chk_always_on_top.toggled.connect(self.ayarlar_degisti)
+        
+        self.chk_dark_mode = QCheckBox("Karanlık Mod (Dark Mode)")
+        self.chk_dark_mode.setChecked(self.settings.get("dark_mode", False))
+        self.chk_dark_mode.toggled.connect(self.ayarlar_degisti)
+        
+        self.chk_clean_pages = QCheckBox("Sayfa Numaralarını Temizle")
+        self.chk_clean_pages.setChecked(self.settings.get("clean_page_numbers", True))
+        self.chk_clean_pages.toggled.connect(self.ayarlar_degisti)
+        
+        self.chk_fix_turkish = QCheckBox("Bozuk Türkçe Karakterleri Düzelt")
+        self.chk_fix_turkish.setChecked(self.settings.get("fix_turkish_chars", True))
+        self.chk_fix_turkish.toggled.connect(self.ayarlar_degisti)
+        
+        self.txt_hotkey = QLineEdit()
+        self.txt_hotkey.setText(self.settings.get("global_hotkey", "ctrl+shift+e"))
+        self.txt_hotkey.setPlaceholderText("Örn: ctrl+shift+e")
+        self.txt_hotkey.editingFinished.connect(self.ayarlar_degisti)
+        
+        ayarlar_layout.addRow(self.chk_always_on_top)
+        ayarlar_layout.addRow(self.chk_dark_mode)
+        ayarlar_layout.addRow(self.chk_clean_pages)
+        ayarlar_layout.addRow(self.chk_fix_turkish)
+        ayarlar_layout.addRow("Kısayol Tuşu:", self.txt_hotkey)
+        
+        if not HAS_KEYBOARD:
+            warn_lbl = QLabel("Kısayol tuşunun çalışması için \nsisteminizde 'keyboard' modülü \nyüklü olmalıdır.\n (pip install keyboard)")
+            warn_lbl.setStyleSheet("color: #e74c3c; font-size: 11px;")
+            ayarlar_layout.addWidget(warn_lbl)
+            
+        right_layout.addWidget(self.group_ayarlar)
+        right_layout.addStretch()
+        
         splitter.addWidget(history_widget)
         splitter.addWidget(self.metin_kutusu)
-        splitter.setSizes([200, 700])
+        splitter.addWidget(right_panel)
+        splitter.setSizes([200, 650, 300])
         
         main_layout.addWidget(splitter)
         
         # Alt Buton
+        bottom_layout = QHBoxLayout()
+        
+        btn_yardim = QPushButton("Yardım")
+        btn_yardim.setMinimumHeight(45)
+        btn_yardim.setMaximumWidth(120)
+        btn_yardim.clicked.connect(self.goster_yardim)
+        
+        btn_hakkinda = QPushButton("Hakkında")
+        btn_hakkinda.setMinimumHeight(45)
+        btn_hakkinda.setMaximumWidth(120)
+        btn_hakkinda.clicked.connect(self.goster_hakkinda)
+        
         self.buton_duzenle = QPushButton("Kopyalanmış Metni Düzenle ve Panoya Kopyala")
         self.buton_duzenle.setMinimumHeight(45)
         self.buton_duzenle.setFont(QFont("Tahoma", 10, QFont.Bold))
         self.buton_duzenle.setCursor(Qt.PointingHandCursor)
         self.buton_duzenle.clicked.connect(self.duzenle_ve_kopyala)
-        main_layout.addWidget(self.buton_duzenle)
+        
+        bottom_layout.addWidget(btn_yardim)
+        bottom_layout.addWidget(btn_hakkinda)
+        bottom_layout.addWidget(self.buton_duzenle)
+        
+        main_layout.addLayout(bottom_layout)
+
+    def ayarlar_degisti(self):
+        eski_kisayol = self.settings.get("global_hotkey")
+        self.settings = {
+            "always_on_top": self.chk_always_on_top.isChecked(),
+            "dark_mode": self.chk_dark_mode.isChecked(),
+            "clean_page_numbers": self.chk_clean_pages.isChecked(),
+            "fix_turkish_chars": self.chk_fix_turkish.isChecked(),
+            "global_hotkey": self.txt_hotkey.text().strip()
+        }
+        self.save_settings()
+        self.apply_settings()
+        
+        if eski_kisayol != self.settings.get("global_hotkey"):
+            self.register_hotkey()
+
+    def on_radio_toggled(self, id, checked):
+        if checked:
+            if id == 1: self.metin_donustur("orijinal")
+            elif id == 2: self.metin_donustur("buyuk")
+            elif id == 3: self.metin_donustur("kucuk")
+            elif id == 4: self.metin_donustur("ilk")
+            elif id == 5: self.metin_donustur("cumle")
 
     def goster_hakkinda(self):
         QMessageBox.about(self, "Hakkında", 
-            "<b>Metni Düzenle v1.2</b><br><br>"
+            "<b>Metni Düzenle v1.3</b><br><br>"
             "Bu uygulama, PDF dosyası, web sayfası,...vb kaynaklardaki metinleri, "
-            "satır ve paragraf yapısını bozmadan kopyalamak amacıyla geliştirilmiştir.<br><br>"
+            "satır ve paragraf yapısını bozmadan kopyalamak ve düzenlemek amacıyla hazırlanmıştır.<br><br>"
             "Geliştirici: Mustafa Halil GÖRENTAŞ<br><br>"
             "<b>Programlama Dili ve Modül Bilgisi:</b><br>"
             "<b>Programlama Dili:</b> Python<br>"
@@ -273,7 +333,7 @@ class MetinDuzenleyici(QMainWindow):
                 <b>4.</b> Düzenlenmiş metni istediğiniz yere doğrudan yapıştırın (`Ctrl+V`).<br><br>
 
                 <b>Ayarlar:</b><br>
-                Uygulamanın sağ üst köşesindeki <b>Ayarlar</b> butonunu kullanarak;
+                Uygulamanın sağ panelindeki <b>Ayarlar</b> bölümünü kullanarak;
                 <ul>
                 <li> <b>Kısayol tuşunuzu</b> değiştirebilir,</li>
                 <li> <b>Karanlık Modu</b> açıp kapatabilir,</li>
@@ -284,19 +344,6 @@ class MetinDuzenleyici(QMainWindow):
             
         )
         QMessageBox.information(self, "Yardım", yardim_metni)
-
-    def goster_ayarlar(self):
-        dialog = AyarlarDialog(self, self.settings)
-        if dialog.exec():
-            yeni_ayarlar = dialog.get_settings()
-            eski_kisayol = self.settings.get("global_hotkey")
-            self.settings = yeni_ayarlar
-            self.save_settings()
-            self.apply_settings()
-            
-            # Kısayol değiştiyse veya klavye dinleyicisi güncellenecekse
-            if eski_kisayol != self.settings.get("global_hotkey"):
-                self.register_hotkey()
 
     def metin_donustur(self, mod):
         metin = self.metin_kutusu.toPlainText()
@@ -387,6 +434,33 @@ class MetinDuzenleyici(QMainWindow):
         if len(self.history_data) > 20:
             self.history_data.pop()
             self.list_history.takeItem(20)
+            
+        self.save_history()
+
+    def sil_secili_gecmis(self):
+        row = self.list_history.currentRow()
+        if row >= 0:
+            self.list_history.takeItem(row)
+            self.history_data.pop(row)
+            self.save_history()
+            
+            if not self.history_data:
+                self.metin_kutusu.clear()
+                self.current_original_text = ""
+
+    def sil_tum_gecmis(self):
+        if not self.history_data:
+            return
+            
+        cevap = QMessageBox.question(self, "Onay", "Tüm geçmişi silmek istediğinize emin misiniz?",
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        if cevap == QMessageBox.Yes:
+            self.list_history.clear()
+            self.history_data.clear()
+            self.save_history()
+            self.metin_kutusu.clear()
+            self.current_original_text = ""
 
     def duzenle_ve_kopyala(self):
         clipboard = QGuiApplication.clipboard()
